@@ -347,7 +347,7 @@ class YoudaoNoteConvert(object):
     @staticmethod
     def covert_html_to_markdown(file_path):
         """
-        转换 HTML 为 MarkDown
+        转换 HTML 为 MarkDown，保留原始 HTML 文件（.note）
         :param file_path:
         :return:
         """
@@ -359,7 +359,7 @@ class YoudaoNoteConvert(object):
         new_content = md(content_str)
         base = os.path.splitext(file_path)[0]
         new_file_path = "".join([base, MARKDOWN_SUFFIX])
-        os.rename(file_path, new_file_path)
+        # 保留原始 .note 文件，仅写入新的 .md
         with open(new_file_path, "wb") as f:
             f.write(new_content.encode())
 
@@ -394,19 +394,19 @@ class YoudaoNoteConvert(object):
     @staticmethod
     def covert_xml_to_markdown(file_path) -> bool:
         """
-        转换 XML 为 MarkDown
+        转换 XML 为 MarkDown，保留原始 XML 文件（.note）
         :param file_path:
         :return:
         """
         base = os.path.splitext(file_path)[0]
         new_file_path = "".join([base, MARKDOWN_SUFFIX])
-        # 如果文件为空，结束
+        # 如果文件为空，仅生成空 .md，保留 .note 原件
         if os.path.getsize(file_path) == 0:
-            os.rename(file_path, new_file_path)
+            open(new_file_path, "wb").close()
             return False
 
         new_content = YoudaoNoteConvert._covert_xml_to_markdown_content(file_path)
-        os.rename(file_path, new_file_path)
+        # 保留原始 .note 文件，仅写入新的 .md
         with open(new_file_path, "wb") as f:
             f.write(new_content.encode("utf-8"))
         return True
@@ -446,20 +446,18 @@ class YoudaoNoteConvert(object):
     @staticmethod
     def covert_json_to_markdown(file_path) -> str:
         """
-        转换 Json 为 MarkDown
+        转换 Json 为 MarkDown，保留原始 JSON 文件（.note）
         :param file_path:
         :return:
         """
         base = os.path.splitext(file_path)[0]
         new_file_path = "".join([base, MARKDOWN_SUFFIX])
-        # 如果文件为空，结束
+        # 如果文件为空，仅生成空 .md，保留 .note 原件
         if os.path.getsize(file_path) == 0:
-            os.rename(file_path, new_file_path)
+            open(new_file_path, "wb").close()
             return False
         new_content = YoudaoNoteConvert._covert_json_to_markdown_content(file_path)
         with open(new_file_path, "wb") as f:
             f.write(new_content.encode("utf-8"))
-        # 删除旧文件
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        # 保留原始 .note 文件
         return new_file_path

@@ -34,6 +34,7 @@ class FileType(Enum):
     MARKDOWN = 1
     XML = 2
     JSON = 3
+    HTML = 4
 
 
 class FileActionEnum(Enum):
@@ -164,13 +165,37 @@ class YoudaoNotePull(object):
             or youdao_file_suffix == ""
         ):
             response = self.youdaonote_api.get_file_by_id(file_id)
+            content = response.content
             # 2、如果文件以 `<?xml` 开头
-            if response.content[:5] == b"<?xml":
+            if content[:5] == b"<?xml":
                 file_type = FileType.XML
             # 3、如果文件以 `{` 开头
-            elif response.content.startswith(b'{"'):
+            elif content.startswith(b'{"'):
                 file_type = FileType.JSON
+            # 4、2017 年以前的 HTML 老笔记，首字节通常是 `<div>` / `<p`，
+            #    或以少量空白（换行、制表符）开头后紧跟 `<`
+            elif self._looks_like_html(content):
+                file_type = FileType.HTML
         return file_type
+
+    @staticmethod
+    def _looks_like_html(content: bytes) -> bool:
+        """判断字节内容是否为 HTML 片段（2017 年以前的有道云笔记）"""
+        if not content:
+            return False
+        # 去除前置空白（HTML 老笔记可能以 `\n\t` 开头）
+        stripped = content.lstrip(b" \t\r\n")
+        if not stripped.startswith(b"<"):
+            return False
+        # 常见的 HTML 起始标签
+        lowered = stripped[:16].lower()
+        html_starts = (
+            b"<div", b"<p ", b"<p>", b"<span", b"<font", b"<h1",
+            b"<h2", b"<h3", b"<ul", b"<ol", b"<table", b"<br",
+            b"<img", b"<a ", b"<a href", b"<pre", b"<blockquote",
+            b"<!doctype", b"<html",
+        )
+        return any(lowered.startswith(s) for s in html_starts)
 
     def _get_file_action(self, local_file_path, modify_time) -> Enum:
         """
@@ -333,6 +358,12 @@ class YoudaoNotePull(object):
                 logging.info("note 笔记转换 MarkDown 失败，将跳过", repr(e))
         elif file_type == FileType.JSON:
             YoudaoNoteConvert.covert_json_to_markdown(file_path)
+        elif file_type == FileType.HTML:
+            # 2017 年以前的 HTML 老笔记
+            try:
+                YoudaoNoteConvert.covert_html_to_markdown(file_path)
+            except Exception as e:
+                logging.info("HTML 笔记转换 MarkDown 失败，将跳过：%s", repr(e))
 
         # 3、迁移文本文件里面的有道云笔记图片（链接）
         if file_type != FileType.OTHER or youdao_file_suffix == MARKDOWN_SUFFIX:

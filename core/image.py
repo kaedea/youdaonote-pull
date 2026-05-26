@@ -7,8 +7,8 @@ from urllib.parse import urlparse
 
 import requests
 
-REGEX_IMAGE_URL = re.compile(r"!\[.*?\]\((.*?note\.youdao\.com.*?)\)")
-REGEX_ATTACH = re.compile(r"\[(.*?)\]\(((http|https)://note\.youdao\.com.*?)\)")
+REGEX_IMAGE_URL = re.compile(r'!\[.*?\]\((\S*?note\.youdao\.com\S*?)(?:\s+"[^"]*")?\)')
+REGEX_ATTACH = re.compile(r'\[(.*?)\]\(((?:http|https)://note\.youdao\.com\S*?)(?:\s+"[^"]*")?\)')
 # 有道云笔记的图片地址
 IMAGES = "images"
 # 有道云笔记的附件地址
@@ -33,6 +33,22 @@ class ImagePull:
         """
         file_path = file_path.replace(" ", "%20")
         return file_path
+
+    @staticmethod
+    def _sanitize_filename(name: str) -> str:
+        """
+        清洗文件名中会破坏文件系统或 Markdown 引用的字符。
+        - macOS：`:` 在 Finder 显示为 `/`，且作为 `xxx:yyy` 出现时
+          可能被某些工具识别为 attribute fork 或扩展属性写入异常。
+        - Windows：禁止 `\\ / : * ? " < > |`
+        其他字符（如括号）保持原样以最大程度保留原始文件名。
+        """
+        if not name:
+            return name
+        illegal = ['\\', '/', ':', '*', '?', '"', '<', '>', '|']
+        for ch in illegal:
+            name = name.replace(ch, '_')
+        return name
 
     def migration_ydnote_url(self, file_path):
         """
@@ -180,6 +196,12 @@ class ImagePull:
             file_name = file_basename + filename
         else:
             file_name = "".join([file_basename, file_suffix])
+
+        # 清洗文件名：剔除会破坏文件系统/Markdown 引用的非法字符
+        # 例如 `cid:xxxxx` 会让 macOS 误认为是 attribute fork，
+        # `?` `*` `<` `>` `|` `"` 在 Windows 不允许
+        file_name = self._sanitize_filename(file_name)
+
         local_file_path = os.path.join(local_file_dir, file_name).replace("\\", "/")
 
         try:

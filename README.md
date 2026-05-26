@@ -168,6 +168,35 @@ pip install -r requirements.txt
 }
 ```
 
+#### 5、避免敏感配置被误提交（推荐）
+
+由于 `cookies.json` 已被仓库追踪（`.gitignore` 对已追踪文件无效），如果你在本地填入真实凭证后直接 `git commit -a`，**真实的 `YNOTE_SESS` 会被推送到 GitHub**，相当于泄露你的有道云笔记账号。`config.json` 同理可能含有本地绝对路径，不适合跟随仓库同步。
+
+推荐使用 `git update-index --skip-worktree` 让 git **忽略本地修改**但**保留仓库模板**：
+
+```shell
+# 一次性设置（仅本地生效，不影响仓库）
+git update-index --skip-worktree config.json cookies.json
+```
+
+执行后效果：
+- `git status` 不再显示这两个文件的修改
+- `git add .` 不会把它们加入暂存区
+- 仓库里仍是脱敏的占位模板（`**` / 空字符串），其他人 clone 后能看到该填什么
+
+验证 / 取消：
+
+```shell
+# 查看当前哪些文件被 skip-worktree（前缀为 S）
+git ls-files -v config.json cookies.json
+
+# 想恢复跟踪本地修改时
+git update-index --no-skip-worktree config.json cookies.json
+```
+
+> 为什么不用 `git rm --cached`？因为它会让仓库里的模板文件消失，其他 clone 的人不知道要建什么文件。
+> 为什么不用 `--assume-unchanged`？因为它在 `git pull` 时可能**静默覆盖**你填好的真实凭证，不安全。
+
 ###  二、运行导出脚本
 
 ```shell
@@ -194,7 +223,7 @@ python pull.py   # Windows
 
 ## 注意事项
 
-1. 如果你自己修改脚本，注意不要将 `cookies.json` 文件 `push` 到 GitHub
+1. 如果你自己修改脚本，注意不要将 `cookies.json` 文件 `push` 到 GitHub（可使用上文 [#5、避免敏感配置被误提交](#5避免敏感配置被误提交推荐) 提到的 `git update-index --skip-worktree` 方案）
 2. 如果你不是开发者，可能对上面的命令行操作有所陌生，建议按步骤慢慢操作一遍
 3. 请确认代码是否为最新，有问题请先看 [issue](https://github.com/DeppWang/youdaonote-pull/issues?q=is%3Aissue+is%3Aclosed) 是否存在，不存在再提 issue
    ```bash
